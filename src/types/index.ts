@@ -36,11 +36,22 @@ export interface ChatMessage {
   };
 }
 
+export interface Conversation {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: number;
+  updatedAt: number;
+  provider: ProviderId;
+  model: string;
+}
+
 export interface GenerationParams {
   temperature: number;
   topP: number;
   topK?: number;
   maxTokens: number;
+  contextLength?: number;
   frequencyPenalty: number;
   presencePenalty: number;
   seed?: number;

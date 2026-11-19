@@ -113,6 +113,34 @@ export function ConfigurationPanel() {
           </div>
         </div>
 
+        {/* Context Length / Max Context Control */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-medium text-neutral-300">Context Length (Max Context)</span>
+            <span className="font-mono text-neutral-400">
+              {(params.contextLength || params.maxTokens).toLocaleString()} tokens
+            </span>
+          </div>
+          <input
+            type="range"
+            min="1024"
+            max={activeModelInfo?.contextWindow ? Math.min(activeModelInfo.contextWindow, 131072) : 32768}
+            step="1024"
+            value={params.contextLength || 8192}
+            onChange={e => {
+              const val = parseInt(e.target.value, 10);
+              updateParams({ contextLength: val });
+            }}
+            className="w-full accent-cyan-400 h-1 bg-neutral-800 rounded-lg cursor-pointer"
+          />
+          <div className="flex justify-between text-[10px] text-neutral-500 mt-1">
+            <span>1,024</span>
+            <span>
+              Target window limit (Hardware: {activeModelInfo?.contextWindow ? `${activeModelInfo.contextWindow.toLocaleString()}` : 'Default'})
+            </span>
+          </div>
+        </div>
+
         {/* Max Tokens */}
         <div>
           <div className="flex items-center justify-between mb-1">

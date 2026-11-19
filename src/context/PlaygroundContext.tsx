@@ -6,6 +6,7 @@ import {
   ModelInfo,
   GenerationParams,
   ChatMessage,
+  Conversation,
   ProviderCapability,
 } from '@/types';
 import { PROVIDERS_METADATA } from '@/lib/adapters';
@@ -35,10 +36,20 @@ interface PlaygroundContextType {
   updateParams: (updates: Partial<GenerationParams>) => void;
   resetParams: () => void;
 
-  // Conversations
+  // Multi-Chat History & Management
+  conversations: Conversation[];
+  currentChatId: string;
+  selectConversation: (id: string) => void;
+  createConversation: (title?: string) => string;
+  renameConversation: (id: string, newTitle: string) => void;
+  deleteConversation: (id: string) => void;
+
+  // Active Conversation Messages
   messages: ChatMessage[];
   isGenerating: boolean;
   sendMessage: (content: string) => Promise<void>;
+  editAndRegenerate: (messageId: string, updatedContent: string) => Promise<void>;
+  branchConversation: (upToMessageId: string) => string;
   stopGeneration: () => void;
   clearMessages: () => void;
   newConversation: () => void;
@@ -51,6 +62,7 @@ const DEFAULT_PARAMS: GenerationParams = {
   topP: 0.95,
   topK: 40,
   maxTokens: 2048,
+  contextLength: 8192,
   frequencyPenalty: 0.0,
   presencePenalty: 0.0,
   seed: undefined,
@@ -74,17 +86,50 @@ export function PlaygroundProvider({ children }: { children: React.ReactNode }) 
   const [systemPrompt, setSystemPrompt] = useState<string>('You are a helpful, concise AI assistant.');
   const [params, setParams] = useState<GenerationParams>(DEFAULT_PARAMS);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Multi-Chat state
+  const initialChatId = 'chat-default-1';
+  const [conversations, setConversations] = useState<Conversation[]>([
+    {
+      id: initialChatId,
+      title: 'New Conversation',
+      messages: [],
+      createdAt: 0,
+      updatedAt: 0,
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    },
+  ]);
+  const [currentChatId, setCurrentChatId] = useState<string>(initialChatId);
+
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
-  // Current provider capabilities
+  // Derive current conversation messages
+  const activeConversation = conversations.find(c => c.id === currentChatId);
+  const messages = activeConversation?.messages || [];
+
+  // Helper to update messages for active conversation
+  const setMessagesForCurrentChat = (updater: (prev: ChatMessage[]) => ChatMessage[]) => {
+    setConversations(prev =>
+      prev.map(c => {
+        if (c.id === currentChatId) {
+          const updatedMessages = updater(c.messages);
+          return {
+            ...c,
+            messages: updatedMessages,
+            updatedAt: Date.now(),
+          };
+        }
+        return c;
+      })
+    );
+  };
+
+  // Provider capabilities
   const currentMetadata = PROVIDERS_METADATA.find(p => p.id === provider) || PROVIDERS_METADATA[0];
   const currentCapabilities = currentMetadata.capabilities;
 
-  // Set provider helper
   const setProvider = (newProvider: ProviderId) => {
     setProviderState(newProvider);
     const meta = PROVIDERS_METADATA.find(p => p.id === newProvider);
@@ -145,7 +190,6 @@ export function PlaygroundProvider({ children }: { children: React.ReactNode }) 
       const data = await res.json();
       if (Array.isArray(data.models) && data.models.length > 0) {
         setModels(data.models);
-        // Only reassign selectedModel if current one isn't in list
         if (!data.models.some((m: ModelInfo) => m.id === selectedModel)) {
           setSelectedModel(data.models[0].id);
         }
@@ -153,7 +197,6 @@ export function PlaygroundProvider({ children }: { children: React.ReactNode }) 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch models';
       setError(`Model discovery note: ${msg}`);
-      // Fallback to default models
       const meta = PROVIDERS_METADATA.find(p => p.id === provider);
       if (meta) {
         setModels(meta.defaultModels);
@@ -166,42 +209,104 @@ export function PlaygroundProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  // On provider switch, update available models
   useEffect(() => {
     refreshModels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider]);
 
-  // Send message
-  const sendMessage = async (userText: string) => {
-    if (!userText.trim() || isGenerating) return;
-
+  // Chat History Management
+  const createConversation = (title?: string): string => {
+    stopGeneration();
+    const newId = `chat-${Date.now()}`;
+    const newChat: Conversation = {
+      id: newId,
+      title: title || 'New Conversation',
+      messages: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      provider,
+      model: selectedModel,
+    };
+    setConversations(prev => [newChat, ...prev]);
+    setCurrentChatId(newId);
     clearError();
-    const userMsgId = `user-${Date.now()}`;
-    const assistantMsgId = `assistant-${Date.now()}`;
+    return newId;
+  };
 
-    const newMessages: ChatMessage[] = [
-      ...messages,
-      {
-        id: userMsgId,
-        role: 'user',
-        content: userText.trim(),
-        timestamp: Date.now(),
-        status: 'complete',
-      },
-    ];
+  const selectConversation = (id: string) => {
+    stopGeneration();
+    setCurrentChatId(id);
+    clearError();
+  };
 
-    setMessages([
-      ...newMessages,
-      {
-        id: assistantMsgId,
-        role: 'assistant',
-        content: '',
-        timestamp: Date.now(),
-        status: 'streaming',
-      },
-    ]);
+  const renameConversation = (id: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    setConversations(prev =>
+      prev.map(c => (c.id === id ? { ...c, title: newTitle.trim(), updatedAt: Date.now() } : c))
+    );
+  };
 
+  const deleteConversation = (id: string) => {
+    stopGeneration();
+    setConversations(prev => {
+      const remaining = prev.filter(c => c.id !== id);
+      if (remaining.length === 0) {
+        const freshId = `chat-${Date.now()}`;
+        setCurrentChatId(freshId);
+        return [
+          {
+            id: freshId,
+            title: 'New Conversation',
+            messages: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            provider,
+            model: selectedModel,
+          },
+        ];
+      }
+      if (currentChatId === id) {
+        setCurrentChatId(remaining[0].id);
+      }
+      return remaining;
+    });
+  };
+
+  // Branch Conversation
+  const branchConversation = (upToMessageId: string): string => {
+    stopGeneration();
+    const targetChat = conversations.find(c => c.id === currentChatId);
+    if (!targetChat) return '';
+
+    const msgIndex = targetChat.messages.findIndex(m => m.id === upToMessageId);
+    if (msgIndex === -1) return '';
+
+    const branchedMessages: ChatMessage[] = targetChat.messages
+      .slice(0, msgIndex + 1)
+      .map(m => ({ ...m }));
+
+    const newId = `chat-branch-${Date.now()}`;
+    const baseTitle = targetChat.title.replace(/\s*\(Branch.*\)$/, '');
+    const newTitle = `${baseTitle} (Branch)`;
+
+    const branchedChat: Conversation = {
+      id: newId,
+      title: newTitle,
+      messages: branchedMessages,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      provider,
+      model: selectedModel,
+    };
+
+    setConversations(prev => [branchedChat, ...prev]);
+    setCurrentChatId(newId);
+    clearError();
+    return newId;
+  };
+
+  // Internal Stream execution
+  const executeChatStream = async (chatMessages: ChatMessage[], assistantMsgId: string, chatId: string) => {
     setIsGenerating(true);
     const controller = new AbortController();
     setAbortController(controller);
@@ -223,7 +328,7 @@ export function PlaygroundProvider({ children }: { children: React.ReactNode }) 
           customEndpoint: customUrl,
           model: selectedModel,
           systemPrompt,
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          messages: chatMessages.map(m => ({ role: m.role, content: m.content })),
           params,
         }),
         signal: controller.signal,
@@ -248,42 +353,178 @@ export function PlaygroundProvider({ children }: { children: React.ReactNode }) 
         const text = decoder.decode(value, { stream: true });
         accumulated += text;
 
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === assistantMsgId
-              ? { ...msg, content: accumulated, status: 'streaming' }
-              : msg
-          )
+        setConversations(prev =>
+          prev.map(c => {
+            if (c.id === chatId) {
+              return {
+                ...c,
+                messages: c.messages.map(msg =>
+                  msg.id === assistantMsgId
+                    ? { ...msg, content: accumulated, status: 'streaming' }
+                    : msg
+                ),
+                updatedAt: Date.now(),
+              };
+            }
+            return c;
+          })
         );
       }
 
-      setMessages(prev =>
-        prev.map(msg =>
-          msg.id === assistantMsgId ? { ...msg, status: 'complete' } : msg
-        )
+      setConversations(prev =>
+        prev.map(c => {
+          if (c.id === chatId) {
+            return {
+              ...c,
+              messages: c.messages.map(msg =>
+                msg.id === assistantMsgId ? { ...msg, status: 'complete' } : msg
+              ),
+              updatedAt: Date.now(),
+            };
+          }
+          return c;
+        })
       );
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === assistantMsgId
-              ? { ...msg, status: 'complete', content: msg.content + ' [Generation stopped by user]' }
-              : msg
-          )
+        setConversations(prev =>
+          prev.map(c => {
+            if (c.id === chatId) {
+              return {
+                ...c,
+                messages: c.messages.map(msg =>
+                  msg.id === assistantMsgId
+                    ? { ...msg, status: 'complete', content: msg.content + ' [Generation stopped]' }
+                    : msg
+                ),
+              };
+            }
+            return c;
+          })
         );
       } else {
         const msg = err instanceof Error ? err.message : 'Unknown error during generation';
         setError(msg);
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === assistantMsgId ? { ...m, status: 'error', content: m.content || `[Error: ${msg}]` } : m
-          )
+        setConversations(prev =>
+          prev.map(c => {
+            if (c.id === chatId) {
+              return {
+                ...c,
+                messages: c.messages.map(m =>
+                  m.id === assistantMsgId
+                    ? { ...m, status: 'error', content: m.content || `[Error: ${msg}]` }
+                    : m
+                ),
+              };
+            }
+            return c;
+          })
         );
       }
     } finally {
       setIsGenerating(false);
       setAbortController(null);
     }
+  };
+
+  // Send new message
+  const sendMessage = async (userText: string) => {
+    if (!userText.trim() || isGenerating) return;
+
+    clearError();
+    const userMsgId = `user-${Date.now()}`;
+    const assistantMsgId = `assistant-${Date.now()}`;
+
+    const newMsg: ChatMessage = {
+      id: userMsgId,
+      role: 'user',
+      content: userText.trim(),
+      timestamp: Date.now(),
+      status: 'complete',
+    };
+
+    const newAssistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      status: 'streaming',
+    };
+
+    const updatedMessages = [...messages, newMsg];
+
+    // Auto-name untitled chat on first message
+    const currentChat = conversations.find(c => c.id === currentChatId);
+    let title = currentChat?.title;
+    if (currentChat && (currentChat.messages.length === 0 || currentChat.title === 'New Conversation')) {
+      title = userText.trim().slice(0, 32);
+    }
+
+    setConversations(prev =>
+      prev.map(c => {
+        if (c.id === currentChatId) {
+          return {
+            ...c,
+            title: title || c.title,
+            messages: [...updatedMessages, newAssistantMsg],
+            updatedAt: Date.now(),
+          };
+        }
+        return c;
+      })
+    );
+
+    await executeChatStream(updatedMessages, assistantMsgId, currentChatId);
+  };
+
+  // Prompt Editing & Regeneration
+  const editAndRegenerate = async (messageId: string, updatedContent: string) => {
+    if (isGenerating) {
+      stopGeneration();
+    }
+    clearError();
+
+    const currentChat = conversations.find(c => c.id === currentChatId);
+    if (!currentChat) return;
+
+    const targetIndex = currentChat.messages.findIndex(m => m.id === messageId);
+    if (targetIndex === -1) return;
+
+    // Up to edited message, with updated content
+    const truncated = currentChat.messages.slice(0, targetIndex).map(m => ({ ...m }));
+    const editedUserMsg: ChatMessage = {
+      id: messageId,
+      role: 'user',
+      content: updatedContent.trim(),
+      timestamp: Date.now(),
+      status: 'complete',
+    };
+
+    const assistantMsgId = `assistant-${Date.now()}`;
+    const newAssistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      status: 'streaming',
+    };
+
+    const finalMessages = [...truncated, editedUserMsg];
+
+    setConversations(prev =>
+      prev.map(c => {
+        if (c.id === currentChatId) {
+          return {
+            ...c,
+            messages: [...finalMessages, newAssistantMsg],
+            updatedAt: Date.now(),
+          };
+        }
+        return c;
+      })
+    );
+
+    await executeChatStream(finalMessages, assistantMsgId, currentChatId);
   };
 
   const stopGeneration = () => {
@@ -296,12 +537,12 @@ export function PlaygroundProvider({ children }: { children: React.ReactNode }) 
 
   const clearMessages = () => {
     stopGeneration();
-    setMessages([]);
+    setMessagesForCurrentChat(() => []);
     clearError();
   };
 
   const newConversation = () => {
-    clearMessages();
+    createConversation();
   };
 
   return (
@@ -325,9 +566,17 @@ export function PlaygroundProvider({ children }: { children: React.ReactNode }) 
         params,
         updateParams,
         resetParams,
+        conversations,
+        currentChatId,
+        selectConversation,
+        createConversation,
+        renameConversation,
+        deleteConversation,
         messages,
         isGenerating,
         sendMessage,
+        editAndRegenerate,
+        branchConversation,
         stopGeneration,
         clearMessages,
         newConversation,

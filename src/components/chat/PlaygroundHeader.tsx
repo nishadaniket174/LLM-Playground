@@ -13,15 +13,21 @@ import {
   ChevronDown,
   Layers,
   Sparkles,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react';
 import { ApiKeysModal } from '../keys/ApiKeysModal';
 
 export function PlaygroundHeader({
   toggleConfig,
   isConfigOpen,
+  toggleSidebar,
+  isSidebarOpen,
 }: {
   toggleConfig: () => void;
   isConfigOpen: boolean;
+  toggleSidebar: () => void;
+  isSidebarOpen: boolean;
 }) {
   const {
     provider,
@@ -46,6 +52,14 @@ export function PlaygroundHeader({
       <header className="h-14 border-b border-neutral-800 bg-[#121214] px-4 flex items-center justify-between gap-4 select-none">
         {/* Left: App Title & Status */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={toggleSidebar}
+            title={isSidebarOpen ? 'Hide Chat History' : 'Show Chat History'}
+            className="p-1.5 rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800 transition-colors"
+          >
+            {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+          </button>
+
           <div className="flex items-center gap-2 font-bold text-sm text-neutral-100 tracking-tight">
             <div className="w-6 h-6 rounded-md bg-neutral-800 border border-neutral-700 flex items-center justify-center text-neutral-200">
               <Sparkles className="w-3.5 h-3.5 text-neutral-300" />
