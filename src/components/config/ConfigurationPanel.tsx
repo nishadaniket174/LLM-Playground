@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { usePlayground } from '@/context/PlaygroundContext';
-import { ChevronDown, Sliders, RotateCcw, Info, Settings2 } from 'lucide-react';
+import { ChevronDown, Sliders, RotateCcw, Settings2, X } from 'lucide-react';
 
-export function ConfigurationPanel() {
+export function ConfigurationPanel({ onClose }: { onClose?: () => void }) {
   const {
     systemPrompt,
     setSystemPrompt,
@@ -31,25 +31,36 @@ export function ConfigurationPanel() {
   };
 
   return (
-    <div className="w-80 h-full flex flex-col bg-[#121214] border-l border-neutral-800 select-none overflow-y-auto">
+    <div className="w-full sm:w-80 md:w-88 h-full flex flex-col bg-[#121214] border-l border-neutral-800 select-none overflow-y-auto shrink-0 z-20">
       {/* Top Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800 bg-[#161618]">
+      <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-neutral-800 bg-[#161618]">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-300">
           <Sliders className="w-4 h-4 text-neutral-400" />
           <span>Inference Parameters</span>
         </div>
-        <button
-          onClick={resetParams}
-          title="Reset all settings to default"
-          className="text-neutral-500 hover:text-neutral-300 p-1 rounded-md hover:bg-neutral-800 transition-colors"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={resetParams}
+            title="Reset all settings to default"
+            className="text-neutral-500 hover:text-neutral-300 p-1.5 sm:p-1 rounded-md hover:bg-neutral-800 transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              title="Close Parameters Panel"
+              className="sm:hidden text-neutral-400 hover:text-white p-1.5 rounded-md hover:bg-neutral-800 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="p-4 space-y-5 text-xs">
+      <div className="p-3.5 sm:p-4 space-y-4 sm:space-y-5 text-xs">
         {/* Model Specs Card (LM Studio inspiration) */}
-        <div className="p-3 bg-neutral-900/90 rounded-lg border border-neutral-800 space-y-1.5">
+        <div className="p-2.5 sm:p-3 bg-neutral-900/90 rounded-lg border border-neutral-800 space-y-1.5">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
             Model Specifications
           </div>
@@ -92,27 +103,6 @@ export function ConfigurationPanel() {
         </div>
 
         {/* Primary Controls */}
-        {/* Temperature */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span className="font-medium text-neutral-300">Temperature</span>
-            <span className="font-mono text-neutral-400">{params.temperature.toFixed(2)}</span>
-          </div>
-          <input
-            type="range"
-            min="0.0"
-            max="2.0"
-            step="0.05"
-            value={params.temperature}
-            onChange={e => updateParams({ temperature: parseFloat(e.target.value) })}
-            className="w-full accent-neutral-300 h-1 bg-neutral-800 rounded-lg cursor-pointer"
-          />
-          <div className="flex justify-between text-[10px] text-neutral-500 mt-1">
-            <span>Precise (0.0)</span>
-            <span>Creative (2.0)</span>
-          </div>
-        </div>
-
         {/* Context Length / Max Context Control */}
         <div>
           <div className="flex items-center justify-between mb-1">
@@ -135,9 +125,30 @@ export function ConfigurationPanel() {
           />
           <div className="flex justify-between text-[10px] text-neutral-500 mt-1">
             <span>1,024</span>
-            <span>
-              Target window limit (Hardware: {activeModelInfo?.contextWindow ? `${activeModelInfo.contextWindow.toLocaleString()}` : 'Default'})
+            <span className="truncate max-w-[170px] text-right">
+              Hardware: {activeModelInfo?.contextWindow ? `${activeModelInfo.contextWindow.toLocaleString()}` : 'Default'}
             </span>
+          </div>
+        </div>
+
+        {/* Temperature */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-medium text-neutral-300">Temperature</span>
+            <span className="font-mono text-neutral-400">{params.temperature.toFixed(2)}</span>
+          </div>
+          <input
+            type="range"
+            min="0.0"
+            max="2.0"
+            step="0.05"
+            value={params.temperature}
+            onChange={e => updateParams({ temperature: parseFloat(e.target.value) })}
+            className="w-full accent-neutral-300 h-1 bg-neutral-800 rounded-lg cursor-pointer"
+          />
+          <div className="flex justify-between text-[10px] text-neutral-500 mt-1">
+            <span>Precise (0.0)</span>
+            <span>Creative (2.0)</span>
           </div>
         </div>
 
