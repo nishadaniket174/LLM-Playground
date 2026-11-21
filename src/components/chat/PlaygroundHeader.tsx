@@ -14,7 +14,8 @@ import {
   Sparkles,
   PanelLeftClose,
   PanelLeft,
-  Menu,
+  MessageSquare,
+  X,
 } from 'lucide-react';
 import { ApiKeysModal } from '../keys/ApiKeysModal';
 
@@ -62,13 +63,18 @@ export function PlaygroundHeader({
               {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
             </button>
 
-            {/* Mobile Menu / Hamburger Toggle */}
+            {/* Mobile Chat / History Toggle Button with clear Label */}
             <button
               onClick={toggleSidebar}
               title="Toggle Conversations History"
-              className="sm:hidden p-1.5 rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800 transition-colors"
+              className={`sm:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                isSidebarOpen
+                  ? 'bg-neutral-800 text-white border-neutral-600'
+                  : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:text-white'
+              }`}
             >
-              <Menu className="w-4 h-4" />
+              <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Chats</span>
             </button>
 
             <div className="flex items-center gap-1.5 font-bold text-xs sm:text-sm text-neutral-100 tracking-tight">
@@ -85,7 +91,7 @@ export function PlaygroundHeader({
           <div className="flex items-center gap-1 sm:gap-1.5">
             <button
               onClick={newConversation}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-neutral-300 hover:text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-md transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-neutral-300 hover:text-white bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-md transition-colors"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               <span>New</span>
@@ -94,7 +100,7 @@ export function PlaygroundHeader({
               <button
                 onClick={clearMessages}
                 title="Clear current messages"
-                className="text-neutral-500 hover:text-red-400 p-1 sm:p-1.5 rounded-md hover:bg-neutral-800 transition-colors"
+                className="text-neutral-500 hover:text-red-400 p-1.5 rounded-md hover:bg-neutral-800 transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -103,7 +109,7 @@ export function PlaygroundHeader({
             {/* Mobile Parameters Panel Toggle */}
             <button
               onClick={toggleConfig}
-              className={`sm:hidden p-1.5 rounded-lg border text-xs transition-colors ${
+              className={`sm:hidden flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs transition-colors ${
                 isConfigOpen
                   ? 'bg-neutral-800 text-white border-neutral-700'
                   : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:text-neutral-200'
@@ -111,6 +117,7 @@ export function PlaygroundHeader({
               title="Toggle Parameters Panel"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span className="text-[11px]">Settings</span>
             </button>
           </div>
         </div>

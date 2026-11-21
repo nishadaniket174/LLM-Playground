@@ -4,43 +4,29 @@ This document records chronological, detailed engineering events, architecture c
 
 ---
 
-## [2026-11-21 21:20:00] - Native Tailwind CSS Mobile Optimization
+## [2026-11-21 21:28:00] - Mobile Chat Interaction & Viewport Usability Refinement
 
 ### 1. Architectural & Layout Changes
-* **Pure Tailwind CSS Responsive Viewport Adaptations**:
-  * Implemented mobile-responsive adaptations while adhering to Next.js Turbopack standards and keeping the native Tailwind integration clean and warning-free.
-  * **Main Chat Canvas**: Automatically scales to 100% viewport width on mobile devices (`< 768px`) with no horizontal overflow or clipped borders.
-  * **Adaptive Overlay Drawers**:
-    * `ChatSidebar` and `ConfigurationPanel` adapt to full-screen/sheet overlays on mobile viewports (`absolute sm:relative inset-y-0 z-30 w-full sm:w-auto`).
-    * On mobile screens, selecting any conversation thread automatically closes the sidebar drawer so users can directly chat.
-  * **Touch-Friendly Controls & Header**:
-    * Integrated a mobile `Menu` hamburger toggle for conversation history.
-    * Integrated a mobile `SlidersHorizontal` button to toggle inference settings without crowding the header.
-    * Added dedicated `X` close buttons to both side drawers on mobile.
-    * Scaled touch target sizes to at least 36–44px and refined message typography (`text-xs sm:text-sm`).
+* **Mobile Viewport Height Calibration (`h-[100dvh]`)**:
+  * Replaced static `h-screen` with dynamic viewport height `h-[100dvh]` so mobile browsers (iOS Safari, Android Chrome) don't push the chat input bar below the bottom navigation bar or virtual keyboard.
+* **Direct Mobile Chat & Navigation Visibility**:
+  * In the mobile header, replaced generic icons with explicit, labeled buttons:
+    * **Chats** button (`MessageSquare` icon + "Chats" label): instantly opens/closes the conversation threads drawer.
+    * **Settings** button (`SlidersHorizontal` icon + "Settings" label): opens/closes the inference configuration panel.
+    * **New** button: immediately starts a fresh conversation thread.
+  * Ensured the main chat canvas and message input area remain active, visible, and focused with `z-10` priority.
 
 ### 2. Files Modified & Exact Mutation Details
 * **File**: `src/components/chat/PlaygroundHeader.tsx`
-  * Implemented adaptive `flex-col sm:flex-row` container with mobile spacing.
-  * Added mobile menu trigger (`Menu`), mobile parameters trigger (`SlidersHorizontal`), and compact provider/model dropdowns.
-* **File**: `src/components/chat/ChatSidebar.tsx`
-  * Responsive width handling (`w-full sm:w-64 md:w-72`).
-  * Added mobile `X` dismiss button and touch-friendly list items.
-* **File**: `src/components/config/ConfigurationPanel.tsx`
-  * Responsive width handling (`w-full sm:w-80 md:w-88`).
-  * Added `onClose` callback and mobile `X` dismiss button.
-* **File**: `src/components/chat/ChatMessagesList.tsx`
-  * Max message bubble width tailored to `max-w-[92%] sm:max-w-[85%]`.
-  * Toolbar buttons (`Branch`, `Edit`, `Copy`) kept visible on touch devices without needing hover.
-* **File**: `src/components/chat/ChatInputBar.tsx`
-  * Responsive padding and textarea typography (`text-xs sm:text-sm`).
+  * Enhanced mobile header controls with clear "Chats" and "Settings" labeled pills.
 * **File**: `src/app/page.tsx`
-  * Overlay sheet management on small viewports with dynamic toggle synchronization.
+  * Configured container to use `h-[100dvh]` to account for mobile browser address/navigation bars.
+  * Layered z-indices cleanly (`z-10` for main canvas, `z-30` for modal drawers).
 
-### 3. Build & Verification
-* `npm run build` completed with code `0`, clean Turbopack compilation, and zero CSS warnings or errors.
+### 3. Build & Health Verification
+* `npm run build` completed with exit code 0 and zero warnings.
 
 ---
 
-## [2026-11-21 21:02:00] - Tailwind CSS & PostCSS Configuration Update
+## [2026-11-21 21:20:00] - Native Tailwind CSS Mobile Optimization
 *(Previous records retained)*
